@@ -7,10 +7,10 @@ using System.Runtime.CompilerServices;
 
 namespace ChunkedCollections;
 
-public class ChunkedList<T, TIndex>(int chunkBitSize, TIndex initialCapacity = default) : IEnumerable<T>
+public class ChunkedList<T, TIndex>(byte chunkBitSize, TIndex initialCapacity = default) : IEnumerable<T>
      where TIndex : unmanaged, IBinaryInteger<TIndex>, ISignedNumber<TIndex>
 {
-    private readonly int _chunkBitSize = chunkBitSize;
+    private readonly byte _chunkBitSize = chunkBitSize;
     private readonly int _chunkSize = 1 << chunkBitSize;
     private readonly int _indexInChunkMask = (1 << chunkBitSize) - 1;
     private T?[]?[] _chunks = TIndex.IsZero(initialCapacity) ? [] : new T?[]?[GetChunkCount(initialCapacity, chunkBitSize)];
@@ -358,6 +358,6 @@ public class ChunkedList<T, TIndex>(int chunkBitSize, TIndex initialCapacity = d
     }
 }
 
-public class ChunkedList<T>(int chunkBitSize, int initialCapacity = 0) : ChunkedList<T, int>(chunkBitSize, initialCapacity);
+public class ChunkedList<T>(byte chunkBitSize, int initialCapacity = 0) : ChunkedList<T, int>(chunkBitSize, initialCapacity);
 
-public class BigChunkedList<T>(int chunkBitSize, long initialCapacity = 0) : ChunkedList<T, long>(chunkBitSize, initialCapacity);
+public class BigChunkedList<T>(byte chunkBitSize, long initialCapacity = 0) : ChunkedList<T, long>(chunkBitSize, initialCapacity);
