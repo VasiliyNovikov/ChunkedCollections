@@ -7,7 +7,7 @@ namespace ChunkedCollections.Benchmarks;
 
 
 [MemoryDiagnoser]
-//[MediumRunJob]
+[ShortRunJob]
 [GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
 public class ChunkedListBenchmarks
 {

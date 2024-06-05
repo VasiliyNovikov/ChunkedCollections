@@ -18,12 +18,8 @@ public class ChunkedList<T, TIndex>(int chunkBitSize, TIndex initialCapacity = d
     private int _nextChunkIndex;
     private int _nextIndexInChunk;
 
-    private static int GetChunkCount(TIndex count, int chunkBitSize)
-    {
-        if (TIndex.IsZero(count))
-            return 0;
-        return Int32.CreateTruncating((count - TIndex.One) >> chunkBitSize) + 1;
-    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static int GetChunkCount(TIndex count, int chunkBitSize) => Int32.CreateTruncating((count - TIndex.One) >> chunkBitSize) + 1;
 
     public TIndex Count
     {
@@ -56,12 +52,12 @@ public class ChunkedList<T, TIndex>(int chunkBitSize, TIndex initialCapacity = d
     {
         if (typeof(TIndex) == typeof(long))
         {
-            if (UInt64.CreateTruncating(index) >= UInt64.CreateTruncating(_count))
+            if ((ulong)(long)(object)index >= (ulong)(long)(object)_count)
                 throw new IndexOutOfRangeException();
         }
         else
         {
-            if (UInt32.CreateTruncating(index) >= UInt32.CreateTruncating(_count))
+            if ((uint)(int)(object)index >= (uint)(int)(object)_count)
                 throw new IndexOutOfRangeException();
         }
 
@@ -89,9 +85,9 @@ public class ChunkedList<T, TIndex>(int chunkBitSize, TIndex initialCapacity = d
         if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
             var count = _count;
-            var chunkCount = GetChunkCount(count, _chunkBitSize);
-            if (chunkCount > 0)
+            if (count > TIndex.Zero)
             {
+                var chunkCount = GetChunkCount(count, _chunkBitSize);
                 for (var i = 0; i < chunkCount - 1; ++i)
                     Array.Clear(_chunks[i]!);
                 Array.Clear(_chunks[chunkCount - 1]!, 0, (Int32.CreateTruncating(count - TIndex.One) & _indexInChunkMask) + 1);
@@ -105,7 +101,8 @@ public class ChunkedList<T, TIndex>(int chunkBitSize, TIndex initialCapacity = d
 
     public void TrimExcess()
     {
-        var chunkCount = GetChunkCount(Count, _chunkBitSize);
+        var count = _count;
+        var chunkCount = count == TIndex.Zero ? 0 : GetChunkCount(count, _chunkBitSize);
         if (chunkCount < _chunks.Length)
             Array.Resize(ref _chunks, chunkCount);
     }
