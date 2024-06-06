@@ -50,17 +50,7 @@ public class ChunkedList<T, TIndex>(byte chunkBitSize, TIndex initialCapacity = 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private ref T ItemRefAt(TIndex index)
     {
-        if (typeof(TIndex) == typeof(long))
-        {
-            if ((ulong)(long)(object)index >= (ulong)(long)(object)_count)
-                throw new IndexOutOfRangeException();
-        }
-        else
-        {
-            if ((uint)(int)(object)index >= (uint)(int)(object)_count)
-                throw new IndexOutOfRangeException();
-        }
-
+        ChunkedCollectionHelper.CheckIndexInRange(index, _count);
         var chunkIndex = Int32.CreateTruncating(index >> _chunkBitSize);
         var indexInChunk = Int32.CreateTruncating(index) & _indexInChunkMask;
         return ref _chunks[chunkIndex]![indexInChunk]!;

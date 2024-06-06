@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Numerics;
-using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace ChunkedCollections;
 
@@ -9,8 +9,11 @@ namespace ChunkedCollections;
 public readonly struct ChunkedBuffer<T, TIndex>
     where TIndex : unmanaged, IBinaryInteger<TIndex>, ISignedNumber<TIndex>
 {
+    private readonly T[]?[] _chunks;
     private readonly TIndex _length;
-    private readonly UnsafeChunkedBucket<T, TIndex> _bucket;
+    private readonly int _chunkSize;
+    private readonly int _indexInChunkMask;
+    private readonly byte _chunkBitSize;
 
     public TIndex Length
     {
@@ -18,25 +21,38 @@ public readonly struct ChunkedBuffer<T, TIndex>
         get => _length;
     }
 
+    public ChunkedReference<T, TIndex> Start
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get
+        {
+            ref var reference = ref MemoryMarshal.GetArrayDataReference(_chunks);
+            return new ChunkedReference<T, TIndex>(ref reference!, 0, _indexInChunkMask, _chunkBitSize);
+        }
+    }
+
     public ref T this[TIndex index]
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
-            UnsafeChunkedBucket<T, TIndex>.CheckIndexInRange(index, _length);
-            return ref _bucket.At(index);
+            ChunkedCollectionHelper.CheckIndexInRange(index, _length);
+            return ref Start.Add(index).Value;
         }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private ChunkedBuffer(TIndex length, in UnsafeChunkedBucket<T, TIndex> bucket)
+    private ChunkedBuffer(T[]?[] chunks, TIndex length, int chunkSize, int indexInChunkMask, byte chunkBitSize)
     {
+        _chunks = chunks;
         _length = length;
-        _bucket = bucket;
+        _chunkSize = chunkSize;
+        _indexInChunkMask = indexInChunkMask;
+        _chunkBitSize = chunkBitSize;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static ChunkedBuffer<T, TIndex> Create(TIndex length, byte chunkBitSize)
+    public static ChunkedBuffer<T, TIndex> Allocate(TIndex length, byte chunkBitSize)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(length, TIndex.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(chunkBitSize, 1);
@@ -44,9 +60,9 @@ public readonly struct ChunkedBuffer<T, TIndex>
 
         var chunkSize = 1 << chunkBitSize;
         var indexInChunkMask = chunkSize - 1;
-        T[]?[]? chunks;
+        T[]?[] chunks;
         if (TIndex.IsZero(length))
-            chunks = null;
+            chunks = [];
         else
         {
             var chunkCount = GetChunkCount(length, chunkBitSize);
@@ -54,15 +70,7 @@ public readonly struct ChunkedBuffer<T, TIndex>
             for (var i = 0; i < chunkCount; ++i)
                 chunks[i] = new T[chunkSize];
         }
-        
-        var bucket = new UnsafeChunkedBucket<T, TIndex>
-        {
-            Chunks = chunks,
-            ChunkSize = chunkSize,
-            IndexInChunkMask = indexInChunkMask,
-            ChunkBitSize = chunkBitSize
-        };
-        return new ChunkedBuffer<T, TIndex>(length, bucket);
+        return new ChunkedBuffer<T, TIndex>(chunks, length, chunkSize, indexInChunkMask, chunkBitSize);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -70,49 +78,52 @@ public readonly struct ChunkedBuffer<T, TIndex>
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(newLength, TIndex.Zero);
 
+        var chunks = buffer._chunks;
         var length = buffer.Length;
+        var chunkSize = buffer._chunkSize;
+        var indexInChunkMask = buffer._indexInChunkMask;
+        var chunkBitSize = buffer._chunkBitSize;
         if (newLength == length)
             return;
 
-        var bucket = buffer._bucket;
-        var oldChunkCount = GetChunkCount(length, bucket.ChunkBitSize);
-        var newChunkCount = GetChunkCount(newLength, bucket.ChunkBitSize);
+        var oldChunkCount = GetChunkCount(length, chunkBitSize);
+        var newChunkCount = GetChunkCount(newLength, chunkBitSize);
 
         if (newChunkCount != oldChunkCount)
         {
             if (newChunkCount == 0)
-                bucket.Chunks = null;
+                chunks = [];
             else
             {
                 if (oldChunkCount == 0)
-                    bucket.Chunks = new T[]?[newChunkCount << 1];
-                else if (newChunkCount <= (oldChunkCount >> 2) || newChunkCount > bucket.Chunks!.Length)
-                    Array.Resize(ref bucket.Chunks, newChunkCount << 1);
+                    chunks = new T[]?[newChunkCount << 1];
+                else if (newChunkCount <= (oldChunkCount >> 2) || newChunkCount > chunks!.Length)
+                    Array.Resize(ref chunks, newChunkCount << 1);
 
                 for (var i = oldChunkCount; i < newChunkCount; ++i)
-                    bucket.Chunks[i] = new T[bucket.ChunkSize];
+                    chunks[i] = new T[chunkSize];
             }
         }
 
-        buffer = new(newLength, bucket);
+        buffer = new(chunks, newLength, chunkSize, indexInChunkMask, chunkBitSize);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ChunkedSpan<T, TIndex> AsSpan() => new ChunkedSpan<T, TIndex>(TIndex.Zero, _length, _bucket);
+    public ChunkedSpan<T, TIndex> AsSpan() => new ChunkedSpan<T, TIndex>(Start, _length);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ChunkedSpan<T, TIndex> AsSpan(TIndex offset)
+    public ChunkedSpan<T, TIndex> AsSpan(TIndex start)
     {
-        UnsafeChunkedBucket<T, TIndex>.CheckIndexInRange(offset, _length);
-        return new ChunkedSpan<T, TIndex>(offset, _length - offset, _bucket);
+        ChunkedCollectionHelper.CheckIndexInRange(start, _length);
+        return new ChunkedSpan<T, TIndex>(Start.Add(start), _length - start);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ChunkedSpan<T, TIndex> AsSpan(TIndex offset, TIndex length)
+    public ChunkedSpan<T, TIndex> AsSpan(TIndex start, TIndex length)
     {
-        UnsafeChunkedBucket<T, TIndex>.CheckIndexInRange(offset, _length);
-        UnsafeChunkedBucket<T, TIndex>.CheckIndexInRange(offset + length, _length + TIndex.One);
-        return new ChunkedSpan<T, TIndex>(offset, length, _bucket);
+        ChunkedCollectionHelper.CheckIndexInRange(start, _length);
+        ChunkedCollectionHelper.CheckIndexInRange(start + length, _length + TIndex.One);
+        return new ChunkedSpan<T, TIndex>(Start.Add(start), length);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
