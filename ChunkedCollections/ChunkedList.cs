@@ -320,16 +320,13 @@ public class ChunkedList<T, TIndex>(byte chunkBitSize, TIndex initialCapacity = 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool MoveNext()
         {
-            ++_index;
-            if (_index >= _count)
+            if (++_index >= _count)
                 return false;
 
-            ++_indexInChunk;
-            if (_indexInChunk == _chunkSize)
+            if (++_indexInChunk == _chunkSize)
             {
                 _indexInChunk = 0;
-                ++_chunkIndex;
-                _currentChunk = _chunks[_chunkIndex];
+                _currentChunk = _chunks[++_chunkIndex];
             }
             return true;
         }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -127,5 +128,41 @@ public readonly struct ChunkedBuffer<T, TIndex>
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Enumerator GetEnumerator() => new(this);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static int GetChunkCount(TIndex count, int chunkBitSize) => Int32.CreateTruncating((count - TIndex.One) >> chunkBitSize) + 1;
+
+    public struct Enumerator(ChunkedBuffer<T, TIndex> buffer)
+    {
+        private readonly T[]?[] _chunks = buffer._chunks;
+        private readonly TIndex _length = buffer._length;
+        private readonly int _chunkSize = buffer._chunkSize;
+        private readonly int _indexInChunkMask = buffer._indexInChunkMask;
+        private readonly byte _chunkBitSize = buffer._chunkBitSize;
+        private TIndex _index = TIndex.NegativeOne;
+        private int _chunkIndex;
+        private T[]? _currentChunk = buffer._length == TIndex.Zero ? null : buffer._chunks[0];
+        private int _indexInChunk = -1;
+
+        public readonly T Current
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => _currentChunk![_indexInChunk];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool MoveNext()
+        {
+            if (++_index >= _length)
+                return false;
+
+            if (++_indexInChunk == _chunkSize)
+            {
+                _indexInChunk = 0;
+                _currentChunk = _chunks[++_chunkIndex];
+            }
+            return true;
+        }
+    }
 }

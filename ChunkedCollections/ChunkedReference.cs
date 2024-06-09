@@ -18,6 +18,18 @@ public readonly ref struct ChunkedReference<T, TIndex>
         get => ref _reference[_offset];
     }
 
+    internal int Offset
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _offset;
+    }
+
+    internal byte ChunkBitSize
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _chunkBitSize;
+    }
+
     internal ChunkedReference(ref T[] reference, int offset, int indexInChunkMask, byte chunkBitSize)
     {
         _reference = ref reference;
@@ -37,5 +49,32 @@ public readonly ref struct ChunkedReference<T, TIndex>
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ChunkedReference<T, TIndex> Next()
+    {
+        var newOffset = _offset + 1;
+        return (newOffset & _indexInChunkMask) == 0
+            ? NextChunk()
+            : new(ref _reference, newOffset, _indexInChunkMask, _chunkBitSize);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ChunkedReference<T, TIndex> Prev()
+    {
+        var offset = _offset;
+        return offset == 0
+            ? new(ref Unsafe.Add(ref _reference, -1), (1 << _chunkBitSize) - 1, _indexInChunkMask, _chunkBitSize)
+            : new(ref _reference, offset - 1, _indexInChunkMask, _chunkBitSize);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ChunkedReference<T, TIndex> NextChunk() => new(ref Unsafe.Add(ref _reference, 1), 0, _indexInChunkMask, _chunkBitSize);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ChunkedReference<T, TIndex> PrevChunk() => new(ref Unsafe.Add(ref _reference, -1), 0, _indexInChunkMask, _chunkBitSize);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ChunkedReference<T, TIndex> operator +(ChunkedReference<T, TIndex> left, TIndex right) => left.Add(right);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static ChunkedReference<T, TIndex> operator ++(ChunkedReference<T, TIndex> value) => value.Next();
 }

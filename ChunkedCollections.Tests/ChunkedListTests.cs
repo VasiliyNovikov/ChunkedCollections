@@ -70,10 +70,10 @@ public class ChunkedListTests
     {
         const int initialCount = 100_000;
         const int chunkBitSize = 5;
+        var random = new Random();
         for (var count = initialCount; count < initialCount + (1 << chunkBitSize); ++count)
         {
             var list = new ChunkedList<int>(5);
-            var random = new Random();
 
             for (var i = 0; i < count; ++i)
                 list.Add(random.Next(0, 10_000));
@@ -90,10 +90,10 @@ public class ChunkedListTests
     {
         const int initialCount = 100_000;
         const int chunkBitSize = 5;
+        var random = new Random();
         for (var count = initialCount; count < initialCount + (1 << chunkBitSize); ++count)
         {
             var list = new ChunkedList<int>(5);
-            var random = new Random();
 
             for (var i = 0; i < count; ++i)
                 list.Add(random.Next(0, 10_000));
@@ -104,4 +104,26 @@ public class ChunkedListTests
                 Assert.IsTrue(list[i - 1] <= list[i]);
         }
     }
+
+    [TestMethod]
+    public void Sort_Span_RandomNumbers_SortedCorrectly()
+    {
+        const int initialCount = 100_000;
+        const int chunkBitSize = 5;
+        var random = new Random();
+        for (var count = initialCount; count < initialCount + (1 << chunkBitSize); ++count)
+        {
+            var buffer = ChunkedBuffer<int, int>.Allocate(count, chunkBitSize);
+            var span = buffer.AsSpan();
+
+            for (var i = 0; i < count; ++i)
+                span[i] = random.Next(0, 10_000);
+
+            span.Sort();
+
+            for (var i = 1; i < span.Length; ++i)
+                Assert.IsTrue(span[i - 1] <= span[i]);
+        }
+    }
+
 }

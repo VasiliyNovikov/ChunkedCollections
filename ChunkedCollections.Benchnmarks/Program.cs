@@ -6,12 +6,12 @@ using System.Linq;
 
 var categories = new[]
 {
-    "Index",
+    //"Index",
     //"Enumerate",
     //"Populate",
     //"Populate Capacity",
-    //"Sort",
+    "Sort",
 };
 
 var config = DefaultConfig.Instance.AddFilter(new SimpleFilter(benchmark => benchmark.Descriptor.Categories.Any(c => categories.Contains(c))));
-BenchmarkRunner.Run<ChunkedListBenchmarks>(config);
+BenchmarkRunner.Run<ChunkedCollectionBenchmarks>(config);
