@@ -11,6 +11,7 @@ using ChunkedBuffer64 = ChunkedBuffer<long, long>;
 
 [MemoryDiagnoser]
 [GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
+[ShortRunJob]
 public class ChunkedCollectionBenchmarks
 {
     private const int Size = 1_000_000;

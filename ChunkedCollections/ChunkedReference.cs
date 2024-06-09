@@ -30,6 +30,7 @@ public readonly ref struct ChunkedReference<T, TIndex>
         get => _chunkBitSize;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal ChunkedReference(ref T[] reference, int offset, int indexInChunkMask, byte chunkBitSize)
     {
         _reference = ref reference;
@@ -41,29 +42,34 @@ public readonly ref struct ChunkedReference<T, TIndex>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ChunkedReference<T, TIndex> Add(TIndex diff)
     {
+        var chunkBitSize = _chunkBitSize;
+        var indexInChunkMask = _indexInChunkMask;
         var diffWithOffset = TIndex.CreateTruncating(_offset) + diff;
-        var chunkIndex = Int32.CreateTruncating(diffWithOffset >> _chunkBitSize);
-        var indexInChunk = Int32.CreateTruncating(diffWithOffset) & _indexInChunkMask;
+        var chunkIndex = Int32.CreateTruncating(diffWithOffset >> chunkBitSize);
+        var indexInChunk = Int32.CreateTruncating(diffWithOffset) & indexInChunkMask;
         ref var reference = ref Unsafe.Add(ref _reference, chunkIndex);
-        return new ChunkedReference<T, TIndex>(ref reference, indexInChunk, _indexInChunkMask, _chunkBitSize);
+        return new ChunkedReference<T, TIndex>(ref reference, indexInChunk, indexInChunkMask, chunkBitSize);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ChunkedReference<T, TIndex> Next()
     {
+        var indexInChunkMask = _indexInChunkMask;
         var newOffset = _offset + 1;
-        return (newOffset & _indexInChunkMask) == 0
-            ? NextChunk()
-            : new(ref _reference, newOffset, _indexInChunkMask, _chunkBitSize);
+        return (newOffset & indexInChunkMask) == 0
+            ? new(ref Unsafe.Add(ref _reference, 1), 0, indexInChunkMask, _chunkBitSize)
+            : new(ref _reference, newOffset, indexInChunkMask, _chunkBitSize);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ChunkedReference<T, TIndex> Prev()
     {
+        var chunkBitSize = _chunkBitSize;
+        var indexInChunkMask = _indexInChunkMask;
         var offset = _offset;
         return offset == 0
-            ? new(ref Unsafe.Add(ref _reference, -1), (1 << _chunkBitSize) - 1, _indexInChunkMask, _chunkBitSize)
-            : new(ref _reference, offset - 1, _indexInChunkMask, _chunkBitSize);
+            ? new(ref Unsafe.Add(ref _reference, -1), (1 << chunkBitSize) - 1, indexInChunkMask, chunkBitSize)
+            : new(ref _reference, offset - 1, indexInChunkMask, chunkBitSize);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

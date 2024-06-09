@@ -88,11 +88,12 @@ public readonly ref struct ChunkedSpan<T, TIndex>
         private ChunkedReference<T, TIndex> _reference = reference;
         private readonly TIndex _length = length;
         private TIndex _index = TIndex.NegativeOne;
+        private T _current = default!;
 
-        public ref readonly T Current
+        public readonly T Current
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => ref _reference.Value;
+            get => _current;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -101,6 +102,7 @@ public readonly ref struct ChunkedSpan<T, TIndex>
             if (++_index >= _length)
                 return false;
 
+            _current = _reference.Value;
             _reference = _reference.Next();
             return true;
         }
@@ -119,7 +121,10 @@ public readonly ref struct ChunkedSpan<T, TIndex>
             get
             {
                 var reference = _reference;
-                return MemoryMarshal.CreateSpan(ref reference.Value, _chunkSize - reference.Offset);
+                var length = _chunkSize - reference.Offset;
+                if (_length < TIndex.CreateTruncating(length))
+                    length = Int32.CreateTruncating(_length);
+                return MemoryMarshal.CreateSpan(ref reference.Value, length);
             }
         }
 
